@@ -1,81 +1,153 @@
 // Game Configuration
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const gridSize = 20;
-const tileCount = canvas.width / gridSize;
+
+// Game Constants
+const GRAVITY = 0.6;
+const JUMP_STRENGTH = -13;
+const MOVE_SPEED = 5;
+const ENEMY_SPEED = 2;
 
 // Game State
-let snake = [];
-let velocityX = 0;
-let velocityY = 0;
-let foodX = 0;
-let foodY = 0;
-let score = 0;
-let highScore = localStorage.getItem('snakeHighScore') || 0;
-let level = 1;
-let gameSpeed = 100;
 let gameLoop = null;
 let isGameRunning = false;
 let isPaused = false;
+let score = 0;
+let lives = 3;
+let highScore = localStorage.getItem('vangoghHighScore') || 0;
 
-// Visual Effects
+// Player (Van Gogh)
+let player = {
+    x: 100,
+    y: 100,
+    width: 40,
+    height: 50,
+    velocityX: 0,
+    velocityY: 0,
+    isJumping: false,
+    direction: 1, // 1 = right, -1 = left
+    isMoving: false
+};
+
+// Input state
+let keys = {};
+
+// Platforms
+let platforms = [];
+
+// Collectibles (Paint Stars)
+let stars = [];
+
+// Enemies (Art Critics)
+let enemies = [];
+
+// Particles
 let particles = [];
-let foodGlow = 0;
-let glowDirection = 1;
 
-// Color Schemes
+// Animation frame counter
+let frameCount = 0;
+
+// Colors
 const colors = {
-    snake: '#4ecca3',
-    snakeGradient: '#45b393',
-    food: '#ff6b6b',
-    foodGlow: '#ff9999',
-    grid: '#2a2a3e',
-    text: '#ffffff',
-    particle: '#ffd700'
+    player: '#ff6b35',
+    playerHat: '#2d3142',
+    playerBeard: '#8b4513',
+    platform: '#4a5568',
+    platformTop: '#718096',
+    star: '#ffd700',
+    enemy: '#8b0000',
+    sky: '#0f172a',
+    ground: '#2d5016'
 };
 
 // Initialize Game
 function init() {
-    snake = [
-        { x: 10, y: 10 },
-        { x: 9, y: 10 },
-        { x: 8, y: 10 }
-    ];
-    velocityX = 1;
-    velocityY = 0;
+    // Reset player
+    player.x = 100;
+    player.y = 100;
+    player.velocityX = 0;
+    player.velocityY = 0;
+    player.isJumping = false;
+    player.direction = 1;
+
     score = 0;
-    level = 1;
-    gameSpeed = 100;
+    lives = 3;
     particles = [];
-    generateFood();
-    updateScore();
-    updateHighScore();
-    updateLevel();
+    frameCount = 0;
+
+    // Create platforms
+    createPlatforms();
+
+    // Create stars
+    createStars();
+
+    // Create enemies
+    createEnemies();
+
+    updateUI();
 }
 
-// Generate Food
-function generateFood() {
-    foodX = Math.floor(Math.random() * tileCount);
-    foodY = Math.floor(Math.random() * tileCount);
+// Create Platforms
+function createPlatforms() {
+    platforms = [
+        // Ground
+        { x: 0, y: canvas.height - 40, width: canvas.width, height: 40 },
 
-    // Ensure food doesn't spawn on snake
-    for (let segment of snake) {
-        if (segment.x === foodX && segment.y === foodY) {
-            generateFood();
-            return;
-        }
-    }
+        // First level platforms
+        { x: 150, y: canvas.height - 140, width: 150, height: 20 },
+        { x: 400, y: canvas.height - 140, width: 150, height: 20 },
+        { x: 650, y: canvas.height - 140, width: 150, height: 20 },
+
+        // Second level platforms
+        { x: 100, y: canvas.height - 240, width: 120, height: 20 },
+        { x: 300, y: canvas.height - 240, width: 200, height: 20 },
+        { x: 580, y: canvas.height - 240, width: 120, height: 20 },
+
+        // Third level platforms
+        { x: 200, y: canvas.height - 340, width: 150, height: 20 },
+        { x: 450, y: canvas.height - 340, width: 150, height: 20 },
+
+        // Top platform
+        { x: 325, y: canvas.height - 440, width: 150, height: 20 }
+    ];
+}
+
+// Create Stars
+function createStars() {
+    stars = [
+        { x: 200, y: canvas.height - 180, collected: false },
+        { x: 475, y: canvas.height - 180, collected: false },
+        { x: 725, y: canvas.height - 180, collected: false },
+        { x: 160, y: canvas.height - 280, collected: false },
+        { x: 400, y: canvas.height - 280, collected: false },
+        { x: 630, y: canvas.height - 280, collected: false },
+        { x: 275, y: canvas.height - 380, collected: false },
+        { x: 525, y: canvas.height - 380, collected: false },
+        { x: 400, y: canvas.height - 480, collected: false }
+    ];
+}
+
+// Create Enemies
+function createEnemies() {
+    enemies = [
+        { x: 400, y: canvas.height - 160, width: 35, height: 35, velocityX: ENEMY_SPEED, minX: 400, maxX: 530 },
+        { x: 300, y: canvas.height - 260, width: 35, height: 35, velocityX: ENEMY_SPEED, minX: 300, maxX: 480 },
+        { x: 200, y: canvas.height - 360, width: 35, height: 35, velocityX: ENEMY_SPEED, minX: 200, maxX: 330 },
+        { x: 450, y: canvas.height - 360, width: 35, height: 35, velocityX: -ENEMY_SPEED, minX: 450, maxX: 580 }
+    ];
 }
 
 // Create Particle Effect
-function createParticles(x, y) {
-    for (let i = 0; i < 15; i++) {
+function createParticles(x, y, color) {
+    for (let i = 0; i < 20; i++) {
         particles.push({
-            x: x * gridSize + gridSize / 2,
-            y: y * gridSize + gridSize / 2,
-            vx: (Math.random() - 0.5) * 6,
-            vy: (Math.random() - 0.5) * 6,
-            life: 30,
+            x: x,
+            y: y,
+            velocityX: (Math.random() - 0.5) * 8,
+            velocityY: (Math.random() - 0.5) * 8 - 2,
+            life: 40,
+            maxLife: 40,
+            color: color,
             size: Math.random() * 4 + 2
         });
     }
@@ -85,8 +157,9 @@ function createParticles(x, y) {
 function updateParticles() {
     for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
+        p.x += p.velocityX;
+        p.y += p.velocityY;
+        p.velocityY += 0.3; // Gravity on particles
         p.life--;
 
         if (p.life <= 0) {
@@ -99,8 +172,8 @@ function updateParticles() {
 function drawParticles() {
     particles.forEach(p => {
         ctx.save();
-        ctx.globalAlpha = p.life / 30;
-        ctx.fillStyle = colors.particle;
+        ctx.globalAlpha = p.life / p.maxLife;
+        ctx.fillStyle = p.color;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
@@ -108,198 +181,363 @@ function drawParticles() {
     });
 }
 
-// Game Update Logic
-function update() {
-    if (isPaused) return;
-
-    // Move snake
-    const head = { x: snake[0].x + velocityX, y: snake[0].y + velocityY };
-
-    // Check wall collision
-    if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-        gameOver();
-        return;
-    }
-
-    // Check self collision
-    for (let segment of snake) {
-        if (head.x === segment.x && head.y === segment.y) {
-            gameOver();
-            return;
-        }
-    }
-
-    // Add new head
-    snake.unshift(head);
-
-    // Check food collision
-    if (head.x === foodX && head.y === foodY) {
-        score++;
-        updateScore();
-        createParticles(foodX, foodY);
-        generateFood();
-
-        // Increase difficulty every 5 points
-        if (score % 5 === 0) {
-            level++;
-            updateLevel();
-            gameSpeed = Math.max(50, gameSpeed - 10);
-            clearInterval(gameLoop);
-            gameLoop = setInterval(gameLoopFunction, gameSpeed);
-        }
-
-        // Update high score
-        if (score > highScore) {
-            highScore = score;
-            localStorage.setItem('snakeHighScore', highScore);
-            updateHighScore();
-        }
-    } else {
-        // Remove tail if no food eaten
-        snake.pop();
-    }
-}
-
-// Draw Game
-function draw() {
-    // Clear canvas with fade effect
-    ctx.fillStyle = colors.grid;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw grid
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < tileCount; i++) {
-        ctx.beginPath();
-        ctx.moveTo(i * gridSize, 0);
-        ctx.lineTo(i * gridSize, canvas.height);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(0, i * gridSize);
-        ctx.lineTo(canvas.width, i * gridSize);
-        ctx.stroke();
-    }
-
-    // Draw food with glow effect
-    foodGlow += glowDirection * 0.5;
-    if (foodGlow >= 10 || foodGlow <= 0) glowDirection *= -1;
+// Draw Van Gogh Character
+function drawPlayer() {
+    const offsetX = player.isMoving ? Math.sin(frameCount * 0.3) * 2 : 0;
 
     ctx.save();
-    ctx.shadowBlur = 20 + foodGlow;
-    ctx.shadowColor = colors.foodGlow;
-    ctx.fillStyle = colors.food;
+
+    // Body
+    ctx.fillStyle = '#4a90e2';
+    ctx.fillRect(player.x + 10, player.y + 20, 20, 25);
+
+    // Head
+    ctx.fillStyle = '#ffdbac';
     ctx.beginPath();
-    ctx.arc(
-        foodX * gridSize + gridSize / 2,
-        foodY * gridSize + gridSize / 2,
-        gridSize / 2 - 2,
-        0,
-        Math.PI * 2
-    );
+    ctx.arc(player.x + 20, player.y + 15, 12, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
 
-    // Draw snake with gradient
-    snake.forEach((segment, index) => {
-        const gradient = ctx.createLinearGradient(
-            segment.x * gridSize,
-            segment.y * gridSize,
-            segment.x * gridSize + gridSize,
-            segment.y * gridSize + gridSize
-        );
+    // Hat
+    ctx.fillStyle = colors.playerHat;
+    ctx.beginPath();
+    ctx.ellipse(player.x + 20, player.y + 8, 14, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(player.x + 10, player.y + 8, 20, 5);
 
-        if (index === 0) {
-            // Head is brighter
-            gradient.addColorStop(0, colors.snake);
-            gradient.addColorStop(1, colors.snakeGradient);
-            ctx.fillStyle = gradient;
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = colors.snake;
-        } else {
-            // Body segments with fading opacity
-            const opacity = 1 - (index / snake.length) * 0.3;
-            ctx.fillStyle = colors.snake;
-            ctx.globalAlpha = opacity;
-            ctx.shadowBlur = 5;
-            ctx.shadowColor = colors.snake;
-        }
+    // Beard
+    ctx.fillStyle = colors.playerBeard;
+    ctx.beginPath();
+    ctx.arc(player.x + 20, player.y + 20, 7, 0, Math.PI);
+    ctx.fill();
 
-        // Draw rounded rectangle for snake segment
-        const x = segment.x * gridSize + 1;
-        const y = segment.y * gridSize + 1;
-        const size = gridSize - 2;
-        const radius = 5;
+    // Eyes
+    ctx.fillStyle = '#000';
+    if (player.direction === 1) {
+        ctx.fillRect(player.x + 23, player.y + 13, 3, 3);
+    } else {
+        ctx.fillRect(player.x + 14, player.y + 13, 3, 3);
+    }
+
+    // Legs
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(player.x + 12, player.y + 45, 6, 5);
+    ctx.fillRect(player.x + 22, player.y + 45, 6, 5);
+
+    // Arms (swinging when moving)
+    ctx.strokeStyle = '#4a90e2';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+
+    if (player.isMoving) {
+        ctx.beginPath();
+        ctx.moveTo(player.x + 12, player.y + 25);
+        ctx.lineTo(player.x + 8 + offsetX, player.y + 35);
+        ctx.stroke();
 
         ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + size - radius, y);
-        ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
-        ctx.lineTo(x + size, y + size - radius);
-        ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
-        ctx.lineTo(x + radius, y + size);
-        ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.moveTo(player.x + 28, player.y + 25);
+        ctx.lineTo(player.x + 32 - offsetX, player.y + 35);
+        ctx.stroke();
+    } else {
+        ctx.beginPath();
+        ctx.moveTo(player.x + 12, player.y + 25);
+        ctx.lineTo(player.x + 8, player.y + 35);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(player.x + 28, player.y + 25);
+        ctx.lineTo(player.x + 32, player.y + 35);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+// Draw Platforms
+function drawPlatforms() {
+    platforms.forEach(platform => {
+        // Platform shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(platform.x + 2, platform.y + 2, platform.width, platform.height);
+
+        // Platform body
+        ctx.fillStyle = colors.platform;
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+
+        // Platform top highlight
+        ctx.fillStyle = colors.platformTop;
+        ctx.fillRect(platform.x, platform.y, platform.width, 4);
+
+        // Platform texture
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < platform.width; i += 20) {
+            ctx.beginPath();
+            ctx.moveTo(platform.x + i, platform.y);
+            ctx.lineTo(platform.x + i, platform.y + platform.height);
+            ctx.stroke();
+        }
+    });
+}
+
+// Draw Stars
+function drawStars() {
+    stars.forEach(star => {
+        if (star.collected) return;
+
+        const starSize = 10;
+        const glow = Math.sin(frameCount * 0.1) * 3 + 7;
+
+        // Glow effect
+        ctx.save();
+        ctx.shadowBlur = glow;
+        ctx.shadowColor = colors.star;
+
+        // Draw 5-pointed star
+        ctx.fillStyle = colors.star;
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+            const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+            const x = star.x + Math.cos(angle) * starSize;
+            const y = star.y + Math.sin(angle) * starSize;
+
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+
+            const innerAngle = angle + Math.PI / 5;
+            const innerX = star.x + Math.cos(innerAngle) * (starSize * 0.5);
+            const innerY = star.y + Math.sin(innerAngle) * (starSize * 0.5);
+            ctx.lineTo(innerX, innerY);
+        }
+        ctx.closePath();
         ctx.fill();
 
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
+        ctx.restore();
+    });
+}
 
-        // Draw eyes on head
-        if (index === 0) {
-            ctx.fillStyle = '#fff';
-            const eyeSize = 3;
-            let eyeX1, eyeY1, eyeX2, eyeY2;
+// Draw Enemies
+function drawEnemies() {
+    enemies.forEach(enemy => {
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(enemy.x + enemy.width / 2, enemy.y + enemy.height + 2, enemy.width / 2, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
 
-            if (velocityX === 1) { // Moving right
-                eyeX1 = x + size - 8;
-                eyeY1 = y + 6;
-                eyeX2 = x + size - 8;
-                eyeY2 = y + size - 6;
-            } else if (velocityX === -1) { // Moving left
-                eyeX1 = x + 8;
-                eyeY1 = y + 6;
-                eyeX2 = x + 8;
-                eyeY2 = y + size - 6;
-            } else if (velocityY === 1) { // Moving down
-                eyeX1 = x + 6;
-                eyeY1 = y + size - 8;
-                eyeX2 = x + size - 6;
-                eyeY2 = y + size - 8;
-            } else { // Moving up
-                eyeX1 = x + 6;
-                eyeY1 = y + 8;
-                eyeX2 = x + size - 6;
-                eyeY2 = y + 8;
-            }
+        // Enemy body (dark blob)
+        ctx.fillStyle = colors.enemy;
+        ctx.beginPath();
+        ctx.arc(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.width / 2, 0, Math.PI * 2);
+        ctx.fill();
 
-            ctx.beginPath();
-            ctx.arc(eyeX1, eyeY1, eyeSize, 0, Math.PI * 2);
-            ctx.arc(eyeX2, eyeY2, eyeSize, 0, Math.PI * 2);
-            ctx.fill();
+        // Eyes
+        ctx.fillStyle = '#fff';
+        const eyeOffset = enemy.velocityX > 0 ? 5 : -5;
+        ctx.beginPath();
+        ctx.arc(enemy.x + enemy.width / 2 - 7 + eyeOffset, enemy.y + enemy.height / 2 - 5, 4, 0, Math.PI * 2);
+        ctx.arc(enemy.x + enemy.width / 2 + 7 + eyeOffset, enemy.y + enemy.height / 2 - 5, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Pupils
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(enemy.x + enemy.width / 2 - 7 + eyeOffset, enemy.y + enemy.height / 2 - 5, 2, 0, Math.PI * 2);
+        ctx.arc(enemy.x + enemy.width / 2 + 7 + eyeOffset, enemy.y + enemy.height / 2 - 5, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Angry mouth
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(enemy.x + enemy.width / 2 - 8, enemy.y + enemy.height / 2 + 8);
+        ctx.lineTo(enemy.x + enemy.width / 2 + 8, enemy.y + enemy.height / 2 + 8);
+        ctx.stroke();
+    });
+}
+
+// Update Player
+function updatePlayer() {
+    // Horizontal movement
+    player.isMoving = false;
+    if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+        player.velocityX = -MOVE_SPEED;
+        player.direction = -1;
+        player.isMoving = true;
+    } else if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+        player.velocityX = MOVE_SPEED;
+        player.direction = 1;
+        player.isMoving = true;
+    } else {
+        player.velocityX = 0;
+    }
+
+    // Apply gravity
+    player.velocityY += GRAVITY;
+
+    // Update position
+    player.x += player.velocityX;
+    player.y += player.velocityY;
+
+    // Horizontal bounds
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+    // Platform collision
+    player.isJumping = true;
+    platforms.forEach(platform => {
+        if (player.x + player.width > platform.x &&
+            player.x < platform.x + platform.width &&
+            player.y + player.height > platform.y &&
+            player.y + player.height < platform.y + platform.height &&
+            player.velocityY > 0) {
+
+            player.y = platform.y - player.height;
+            player.velocityY = 0;
+            player.isJumping = false;
         }
     });
 
-    // Draw particles
-    updateParticles();
-    drawParticles();
+    // Check if fallen off screen
+    if (player.y > canvas.height) {
+        loseLife();
+    }
+}
 
-    // Draw pause indicator
-    if (isPaused) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 30px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+// Update Enemies
+function updateEnemies() {
+    enemies.forEach(enemy => {
+        enemy.x += enemy.velocityX;
+
+        // Bounce at boundaries
+        if (enemy.x <= enemy.minX || enemy.x >= enemy.maxX) {
+            enemy.velocityX *= -1;
+        }
+    });
+}
+
+// Check Collisions
+function checkCollisions() {
+    // Star collection
+    stars.forEach(star => {
+        if (star.collected) return;
+
+        const dx = player.x + player.width / 2 - star.x;
+        const dy = player.y + player.height / 2 - star.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 20) {
+            star.collected = true;
+            score += 10;
+            updateScore();
+            createParticles(star.x, star.y, colors.star);
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('vangoghHighScore', highScore);
+                updateHighScore();
+            }
+        }
+    });
+
+    // Enemy collision
+    enemies.forEach(enemy => {
+        if (player.x + player.width > enemy.x &&
+            player.x < enemy.x + enemy.width &&
+            player.y + player.height > enemy.y &&
+            player.y < enemy.y + enemy.height) {
+
+            // Check if jumping on enemy
+            if (player.velocityY > 0 && player.y + player.height - player.velocityY <= enemy.y) {
+                // Defeat enemy
+                createParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, colors.enemy);
+                score += 20;
+                updateScore();
+                player.velocityY = JUMP_STRENGTH * 0.6; // Small bounce
+
+                // Respawn enemy at random position
+                enemy.x = Math.random() > 0.5 ? enemy.minX : enemy.maxX;
+            } else {
+                // Take damage
+                loseLife();
+            }
+        }
+    });
+}
+
+// Lose Life
+function loseLife() {
+    lives--;
+    updateLives();
+
+    if (lives <= 0) {
+        gameOver();
+    } else {
+        // Reset player position
+        player.x = 100;
+        player.y = 100;
+        player.velocityX = 0;
+        player.velocityY = 0;
+        createParticles(player.x + player.width / 2, player.y + player.height / 2, '#ff0000');
     }
 }
 
 // Game Loop
 function gameLoopFunction() {
-    update();
+    if (isPaused) {
+        drawPauseScreen();
+        return;
+    }
+
+    frameCount++;
+
+    // Update
+    updatePlayer();
+    updateEnemies();
+    checkCollisions();
+    updateParticles();
+
+    // Draw
     draw();
+}
+
+// Draw Game
+function draw() {
+    // Clear canvas
+    ctx.fillStyle = colors.sky;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw starry background
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    for (let i = 0; i < 50; i++) {
+        const x = (i * 123) % canvas.width;
+        const y = (i * 456) % canvas.height;
+        const size = (i % 3) + 1;
+        ctx.beginPath();
+        ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Draw game objects
+    drawPlatforms();
+    drawStars();
+    drawEnemies();
+    drawPlayer();
+    drawParticles();
+}
+
+// Draw Pause Screen
+function drawPauseScreen() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+
+    ctx.font = '24px Arial';
+    ctx.fillText('Press P to Resume', canvas.width / 2, canvas.height / 2 + 50);
 }
 
 // Start Game
@@ -312,7 +550,7 @@ function startGame() {
     document.getElementById('startScreen').classList.add('hidden');
     document.getElementById('gameOver').classList.add('hidden');
 
-    gameLoop = setInterval(gameLoopFunction, gameSpeed);
+    gameLoop = setInterval(gameLoopFunction, 1000 / 60); // 60 FPS
 }
 
 // Game Over
@@ -325,67 +563,52 @@ function gameOver() {
 }
 
 // Update UI
+function updateUI() {
+    updateScore();
+    updateLives();
+    updateHighScore();
+}
+
 function updateScore() {
     document.getElementById('score').textContent = score;
+}
+
+function updateLives() {
+    document.getElementById('lives').textContent = lives;
 }
 
 function updateHighScore() {
     document.getElementById('highScore').textContent = highScore;
 }
 
-function updateLevel() {
-    document.getElementById('level').textContent = level;
-}
-
 // Keyboard Controls
 document.addEventListener('keydown', (e) => {
-    // Prevent default behavior for arrow keys and space
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+    keys[e.key] = true;
+
+    // Jump
+    if ((e.key === ' ' || e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') && !player.isJumping && isGameRunning && !isPaused) {
+        player.velocityY = JUMP_STRENGTH;
+        player.isJumping = true;
         e.preventDefault();
     }
 
-    if (!isGameRunning && e.key !== ' ') return;
-
-    switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-            if (velocityY !== 1) {
-                velocityX = 0;
-                velocityY = -1;
-            }
-            break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-            if (velocityY !== -1) {
-                velocityX = 0;
-                velocityY = 1;
-            }
-            break;
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
-            if (velocityX !== 1) {
-                velocityX = -1;
-                velocityY = 0;
-            }
-            break;
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
-            if (velocityX !== -1) {
-                velocityX = 1;
-                velocityY = 0;
-            }
-            break;
-        case ' ':
-            if (isGameRunning) {
-                isPaused = !isPaused;
-                draw(); // Redraw to show pause indicator
-            }
-            break;
+    // Pause
+    if ((e.key === 'p' || e.key === 'P') && isGameRunning) {
+        isPaused = !isPaused;
+        if (!isPaused) {
+            gameLoopFunction();
+        }
+        e.preventDefault();
     }
+
+    // Prevent arrow key scrolling
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+        e.preventDefault();
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
 });
 
 // Button Event Listeners
@@ -394,4 +617,4 @@ document.getElementById('restartBtn').addEventListener('click', startGame);
 
 // Initial setup
 updateHighScore();
-draw(); // Draw initial grid
+draw();
