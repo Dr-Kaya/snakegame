@@ -48,4 +48,15 @@ A fun and engaging snake game built with HTML5, CSS3, and JavaScript!
 - Vanilla JavaScript for game logic
 - LocalStorage for high score persistence
 
+## Deployment
+
+Want to share your game online? See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
+
+**Quick Deploy Options:**
+- **GitHub Pages** - Enable in repository settings (easiest!)
+- **Netlify** - Drag and drop deployment at netlify.com
+- **Vercel** - One-click deploy at vercel.com
+
+All options are free and take just a few minutes!
+
 Enjoy playing!
