@@ -6,7 +6,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -15,12 +15,12 @@ body {
 }
 
 .game-container {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(10px);
     border-radius: 20px;
     padding: 30px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(0, 255, 136, 0.2);
 }
 
 .header {
@@ -43,25 +43,29 @@ body {
 }
 
 .stat-item {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(0, 255, 136, 0.1);
     padding: 10px 20px;
     border-radius: 10px;
     backdrop-filter: blur(5px);
     min-width: 120px;
+    border: 1px solid rgba(0, 255, 136, 0.2);
 }
 
 .stat-label {
     display: block;
     font-size: 0.9em;
-    opacity: 0.9;
+    opacity: 0.8;
     margin-bottom: 5px;
+    color: #aaa;
 }
 
 .stat-value {
     display: block;
     font-size: 1.5em;
     font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    color: #00ff88;
+    transition: transform 0.2s ease;
 }
 
 .game-wrapper {
@@ -73,8 +77,9 @@ body {
 
 #gameCanvas {
     border-radius: 10px;
-    background: #1a1a2e;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    background: #0a0e27;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6),
+                inset 0 0 0 2px rgba(0, 255, 136, 0.1);
     display: block;
 }
 
@@ -131,15 +136,15 @@ body {
 }
 
 .btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
     border: none;
     padding: 15px 40px;
     font-size: 1.2em;
-    color: white;
+    color: #0a0e27;
     border-radius: 50px;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -147,7 +152,8 @@ body {
 
 .btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 6px 20px rgba(0, 255, 136, 0.5);
+    background: linear-gradient(135deg, #00ffaa 0%, #00dd77 100%);
 }
 
 .btn:active {
@@ -155,7 +161,7 @@ body {
 }
 
 .btn-start {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
     padding: 20px 60px;
     font-size: 1.4em;
 }

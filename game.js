@@ -1,7 +1,7 @@
 // Game Configuration
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const gridSize = 20;
+const gridSize = 25;
 const tileCount = canvas.width / gridSize;
 
 // Game State
@@ -13,40 +13,41 @@ let foodY = 0;
 let score = 0;
 let highScore = localStorage.getItem('snakeHighScore') || 0;
 let level = 1;
-let gameSpeed = 100;
+let gameSpeed = 150; // Slower starting speed (was 100)
 let gameLoop = null;
 let isGameRunning = false;
 let isPaused = false;
+let inputBuffer = null; // For smoother controls
 
 // Visual Effects
-let particles = [];
-let foodGlow = 0;
-let glowDirection = 1;
+let foodPulse = 0;
 
-// Color Schemes
+// Color Schemes - Clean, high contrast colors
 const colors = {
-    snake: '#4ecca3',
-    snakeGradient: '#45b393',
-    food: '#ff6b6b',
-    foodGlow: '#ff9999',
-    grid: '#2a2a3e',
+    background: '#0a0e27',
+    grid: '#1a1f3a',
+    snake: '#00ff88',
+    snakeHead: '#00ffaa',
+    snakeBorder: '#00cc66',
+    food: '#ff3366',
+    foodBorder: '#cc0033',
     text: '#ffffff',
-    particle: '#ffd700'
+    score: '#ffd700'
 };
 
 // Initialize Game
 function init() {
     snake = [
-        { x: 10, y: 10 },
-        { x: 9, y: 10 },
-        { x: 8, y: 10 }
+        { x: 8, y: 8 },
+        { x: 7, y: 8 },
+        { x: 6, y: 8 }
     ];
     velocityX = 1;
     velocityY = 0;
     score = 0;
     level = 1;
-    gameSpeed = 100;
-    particles = [];
+    gameSpeed = 150; // Start slower
+    inputBuffer = null;
     generateFood();
     updateScore();
     updateHighScore();
@@ -67,50 +68,26 @@ function generateFood() {
     }
 }
 
-// Create Particle Effect
-function createParticles(x, y) {
-    for (let i = 0; i < 15; i++) {
-        particles.push({
-            x: x * gridSize + gridSize / 2,
-            y: y * gridSize + gridSize / 2,
-            vx: (Math.random() - 0.5) * 6,
-            vy: (Math.random() - 0.5) * 6,
-            life: 30,
-            size: Math.random() * 4 + 2
-        });
-    }
-}
-
-// Update Particles
-function updateParticles() {
-    for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life--;
-
-        if (p.life <= 0) {
-            particles.splice(i, 1);
-        }
-    }
-}
-
-// Draw Particles
-function drawParticles() {
-    particles.forEach(p => {
-        ctx.save();
-        ctx.globalAlpha = p.life / 30;
-        ctx.fillStyle = colors.particle;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    });
+// Simple visual feedback when eating food
+function flashScore() {
+    const scoreElement = document.getElementById('score');
+    scoreElement.style.transform = 'scale(1.3)';
+    setTimeout(() => {
+        scoreElement.style.transform = 'scale(1)';
+    }, 200);
 }
 
 // Game Update Logic
 function update() {
     if (isPaused) return;
+
+    // Apply buffered input for smoother controls
+    if (inputBuffer) {
+        const [newVX, newVY] = inputBuffer;
+        velocityX = newVX;
+        velocityY = newVY;
+        inputBuffer = null;
+    }
 
     // Move snake
     const head = { x: snake[0].x + velocityX, y: snake[0].y + velocityY };
@@ -136,14 +113,14 @@ function update() {
     if (head.x === foodX && head.y === foodY) {
         score++;
         updateScore();
-        createParticles(foodX, foodY);
+        flashScore();
         generateFood();
 
-        // Increase difficulty every 5 points
-        if (score % 5 === 0) {
+        // Increase difficulty more gradually - every 10 points, decrease by 8ms
+        if (score % 10 === 0 && score > 0) {
             level++;
             updateLevel();
-            gameSpeed = Math.max(50, gameSpeed - 10);
+            gameSpeed = Math.max(80, gameSpeed - 8);
             clearInterval(gameLoop);
             gameLoop = setInterval(gameLoopFunction, gameSpeed);
         }
@@ -162,137 +139,107 @@ function update() {
 
 // Draw Game
 function draw() {
-    // Clear canvas with fade effect
-    ctx.fillStyle = colors.grid;
+    // Clear canvas with solid background
+    ctx.fillStyle = colors.background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw grid
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    // Draw subtle grid
+    ctx.strokeStyle = colors.grid;
     ctx.lineWidth = 1;
-    for (let i = 0; i < tileCount; i++) {
+    for (let i = 0; i <= tileCount; i++) {
+        // Vertical lines
         ctx.beginPath();
         ctx.moveTo(i * gridSize, 0);
         ctx.lineTo(i * gridSize, canvas.height);
         ctx.stroke();
 
+        // Horizontal lines
         ctx.beginPath();
         ctx.moveTo(0, i * gridSize);
         ctx.lineTo(canvas.width, i * gridSize);
         ctx.stroke();
     }
 
-    // Draw food with glow effect
-    foodGlow += glowDirection * 0.5;
-    if (foodGlow >= 10 || foodGlow <= 0) glowDirection *= -1;
+    // Draw food with subtle pulse
+    foodPulse += 0.1;
+    const pulseSize = Math.sin(foodPulse) * 2;
 
-    ctx.save();
-    ctx.shadowBlur = 20 + foodGlow;
-    ctx.shadowColor = colors.foodGlow;
-    ctx.fillStyle = colors.food;
-    ctx.beginPath();
-    ctx.arc(
-        foodX * gridSize + gridSize / 2,
-        foodY * gridSize + gridSize / 2,
-        gridSize / 2 - 2,
-        0,
-        Math.PI * 2
+    const foodSize = gridSize - 6 + pulseSize;
+    const foodOffset = (gridSize - foodSize) / 2;
+
+    // Food border
+    ctx.fillStyle = colors.foodBorder;
+    ctx.fillRect(
+        foodX * gridSize + foodOffset - 1,
+        foodY * gridSize + foodOffset - 1,
+        foodSize + 2,
+        foodSize + 2
     );
-    ctx.fill();
-    ctx.restore();
 
-    // Draw snake with gradient
+    // Food fill
+    ctx.fillStyle = colors.food;
+    ctx.fillRect(
+        foodX * gridSize + foodOffset,
+        foodY * gridSize + foodOffset,
+        foodSize,
+        foodSize
+    );
+
+    // Draw snake
     snake.forEach((segment, index) => {
-        const gradient = ctx.createLinearGradient(
-            segment.x * gridSize,
-            segment.y * gridSize,
-            segment.x * gridSize + gridSize,
-            segment.y * gridSize + gridSize
-        );
+        const x = segment.x * gridSize + 2;
+        const y = segment.y * gridSize + 2;
+        const size = gridSize - 4;
 
         if (index === 0) {
-            // Head is brighter
-            gradient.addColorStop(0, colors.snake);
-            gradient.addColorStop(1, colors.snakeGradient);
-            ctx.fillStyle = gradient;
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = colors.snake;
-        } else {
-            // Body segments with fading opacity
-            const opacity = 1 - (index / snake.length) * 0.3;
-            ctx.fillStyle = colors.snake;
-            ctx.globalAlpha = opacity;
-            ctx.shadowBlur = 5;
-            ctx.shadowColor = colors.snake;
-        }
+            // Draw head with border
+            ctx.fillStyle = colors.snakeBorder;
+            ctx.fillRect(x - 1, y - 1, size + 2, size + 2);
 
-        // Draw rounded rectangle for snake segment
-        const x = segment.x * gridSize + 1;
-        const y = segment.y * gridSize + 1;
-        const size = gridSize - 2;
-        const radius = 5;
+            ctx.fillStyle = colors.snakeHead;
+            ctx.fillRect(x, y, size, size);
 
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + size - radius, y);
-        ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
-        ctx.lineTo(x + size, y + size - radius);
-        ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
-        ctx.lineTo(x + radius, y + size);
-        ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.fill();
+            // Draw simple eyes
+            ctx.fillStyle = colors.background;
+            const eyeSize = 4;
+            const eyeOffset = 6;
 
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
-
-        // Draw eyes on head
-        if (index === 0) {
-            ctx.fillStyle = '#fff';
-            const eyeSize = 3;
-            let eyeX1, eyeY1, eyeX2, eyeY2;
-
-            if (velocityX === 1) { // Moving right
-                eyeX1 = x + size - 8;
-                eyeY1 = y + 6;
-                eyeX2 = x + size - 8;
-                eyeY2 = y + size - 6;
-            } else if (velocityX === -1) { // Moving left
-                eyeX1 = x + 8;
-                eyeY1 = y + 6;
-                eyeX2 = x + 8;
-                eyeY2 = y + size - 6;
-            } else if (velocityY === 1) { // Moving down
-                eyeX1 = x + 6;
-                eyeY1 = y + size - 8;
-                eyeX2 = x + size - 6;
-                eyeY2 = y + size - 8;
-            } else { // Moving up
-                eyeX1 = x + 6;
-                eyeY1 = y + 8;
-                eyeX2 = x + size - 6;
-                eyeY2 = y + 8;
+            if (velocityX === 1) { // Right
+                ctx.fillRect(x + size - eyeOffset - eyeSize, y + eyeOffset, eyeSize, eyeSize);
+                ctx.fillRect(x + size - eyeOffset - eyeSize, y + size - eyeOffset - eyeSize, eyeSize, eyeSize);
+            } else if (velocityX === -1) { // Left
+                ctx.fillRect(x + eyeOffset, y + eyeOffset, eyeSize, eyeSize);
+                ctx.fillRect(x + eyeOffset, y + size - eyeOffset - eyeSize, eyeSize, eyeSize);
+            } else if (velocityY === 1) { // Down
+                ctx.fillRect(x + eyeOffset, y + size - eyeOffset - eyeSize, eyeSize, eyeSize);
+                ctx.fillRect(x + size - eyeOffset - eyeSize, y + size - eyeOffset - eyeSize, eyeSize, eyeSize);
+            } else if (velocityY === -1) { // Up
+                ctx.fillRect(x + eyeOffset, y + eyeOffset, eyeSize, eyeSize);
+                ctx.fillRect(x + size - eyeOffset - eyeSize, y + eyeOffset, eyeSize, eyeSize);
             }
+        } else {
+            // Draw body segments
+            ctx.fillStyle = colors.snakeBorder;
+            ctx.fillRect(x - 1, y - 1, size + 2, size + 2);
 
-            ctx.beginPath();
-            ctx.arc(eyeX1, eyeY1, eyeSize, 0, Math.PI * 2);
-            ctx.arc(eyeX2, eyeY2, eyeSize, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillStyle = colors.snake;
+            ctx.fillRect(x, y, size, size);
         }
     });
 
-    // Draw particles
-    updateParticles();
-    drawParticles();
-
     // Draw pause indicator
     if (isPaused) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 30px Arial';
+
+        ctx.fillStyle = colors.text;
+        ctx.font = 'bold 40px Arial';
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+
+        ctx.font = '20px Arial';
+        ctx.fillText('Press SPACE to continue', canvas.width / 2, canvas.height / 2 + 40);
     }
 }
 
@@ -337,7 +284,7 @@ function updateLevel() {
     document.getElementById('level').textContent = level;
 }
 
-// Keyboard Controls
+// Keyboard Controls with input buffering for smoother gameplay
 document.addEventListener('keydown', (e) => {
     // Prevent default behavior for arrow keys and space
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
@@ -350,33 +297,29 @@ document.addEventListener('keydown', (e) => {
         case 'ArrowUp':
         case 'w':
         case 'W':
-            if (velocityY !== 1) {
-                velocityX = 0;
-                velocityY = -1;
+            if (velocityY !== 1 && velocityY !== -1) {
+                inputBuffer = [0, -1];
             }
             break;
         case 'ArrowDown':
         case 's':
         case 'S':
-            if (velocityY !== -1) {
-                velocityX = 0;
-                velocityY = 1;
+            if (velocityY !== -1 && velocityY !== 1) {
+                inputBuffer = [0, 1];
             }
             break;
         case 'ArrowLeft':
         case 'a':
         case 'A':
-            if (velocityX !== 1) {
-                velocityX = -1;
-                velocityY = 0;
+            if (velocityX !== 1 && velocityX !== -1) {
+                inputBuffer = [-1, 0];
             }
             break;
         case 'ArrowRight':
         case 'd':
         case 'D':
-            if (velocityX !== -1) {
-                velocityX = 1;
-                velocityY = 0;
+            if (velocityX !== -1 && velocityX !== 1) {
+                inputBuffer = [1, 0];
             }
             break;
         case ' ':
